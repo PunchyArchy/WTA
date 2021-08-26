@@ -54,10 +54,11 @@ class CompaniesDB(WTADB):
 class AutoS(WTAS):
     """ Оператор передачи данных в AR. """
 
-    def send(self, car_number, wserver_id, model, rfid, id_type,
-             rg_weight):
-        self.add_auto(car_number, wserver_id, model, rfid, id_type,
-                      rg_weight)
+    def send(self, car_number, wserver_id, model=None, rfid=None, rfid_id=None,
+             id_type=None, rg_weight=None, *args, **kwargs):
+        self.add_auto(car_number=car_number, wserver_id=wserver_id,
+                      model=model, id_type=id_type, rg_weight=rg_weight,
+                      rfid=rfid, rfid_id=rfid_id)
 
 
 class AutoDB(WTADB):
@@ -110,7 +111,7 @@ class GetOperator:
                           }
 
     @no_operator
-    def get_wtas(self, name):
+    def get_wtas_class(self, name):
         """
         Вернуть объект класса WTADB.
 
@@ -120,7 +121,7 @@ class GetOperator:
         return self.operators[name]['wtas']
 
     @no_operator
-    def get_wtadb(self, name):
+    def get_wtadb_class(self, name):
         """
         Вернуть объект класса WTADB.
 
@@ -147,42 +148,75 @@ class WTA(GetOperator):
     По сути - god-object (плохо, да, но до жути удобно).
     """
 
-    def __init__(self, name, *args, **kwargs):
+    def __init__(self, name, dbname, user, password, host, polygon_id,
+                 *args, **kwargs):
         """
         Инициализация.
 
-        :param name: Имя для оператора
+        :param name: Название вида данных.
+        :param dbname: Имя базы данных (GDB).
+        :param user: Имя пользователя БД.
+        :param password: Пароль пользователя БД.
+        :param host: Адрес машины, на котором хостится БД.
+        :param polygon_id: ID полигона, куда отправить данные.
+        :param args:
+        :param kwargs:
         """
         super(WTA, self).__init__(*args, **kwargs)
-        self.wtas, self.wtadb = self.get_operators(name)
+        self.wtadb = self.get_wtadb(name, dbname, user, password, host,
+                                    polygon_id)
+        pol_info = self.wtadb.fetch_polygon_info()
+        self.wtas = self.get_wtas(name, pol_info['ip'], pol_info['port'])
 
-    def operate_response(self, response, report_id):
+    def operate_response(self, ar_response, report_id, wserver_id):
         """ Обработчиков ответа от GCore
-        :param response: Сам ответ.
+        :param wserver_id: ID в GDB.
+        :param ar_response: Сам ответ.
         :param report_id: ID отчета об отправке.
-        :return: Возвращает True, при успешном выполнении кода. """
+        :return: Возвращает словарь со статусом выполнения. """
+        response = {}
+        response['report_id'] = report_id
+        response['wserver_id'] = wserver_id
         if response['info']['status'] == 'success':
-            self.wtadb.mark_get(wdb_id=response['info']['info'][0][0],
+            self.wtadb.mark_get(wdb_id=ar_response['info']['info'][0][0],
                                 report_id=report_id)
+            response['success_save'] = True
         else:
-            self.wtadb.mark_fail(response['info']['info'], report_id)
-        return True
+            response['success_save'] = False
+            self.wtadb.mark_fail(ar_response['info']['info'], report_id)
+        return response
 
-    def get_operators(self, name):
+    def get_wtadb(self, name, dbname, user, password, host, polygon_id):
+        """
+        Вернуть инстанс класса WTADB, предназначенный для работы с данными вида
+        name.
+        :param name: Название вида данных.
+        :param dbname: Имя базы данных (GDB).
+        :param user: Имя пользователя БД.
+        :param password: Пароль пользователя БД.
+        :param host: Адрес машины, на котором хостится БД.
+        :param polygon_id: ID полигона, куда отправить данные.
+        :return:
+        """
+        wtadb_class = self.get_wtadb_class(name)
+        wtadb = wtadb_class(dbname=dbname, user=user,
+                            password=password,
+                            host=host,
+                            polygon_id=polygon_id)
+        return wtadb
+
+    def get_wtas(self, name, polygon_ip, polygon_port):
         """ Получить объекты для работы с БД и с GCore по названию.
+
         :param name: Название данных.
+        :param polygon_ip: IP GCore QDK.
+        :param polygon_port: Порт GCore QDK.
         :return: Если объекты предусмотрены - вернет True.
         """
-        wtas_class = self.get_wtas(name)
-        wtadb_class = self.get_wtadb(name)
-        wtadb = wtadb_class(dbname='gdb', user='watchman',
-                            password='hect0r1337',
-                            host='192.168.100.118',
-                            polygon_id=9)
-        pol_info = wtadb.fetch_polygon_info()
-        wtas = wtas_class(polygon_ip=pol_info['ip'],
-                          polygon_port=pol_info['port'])
-        return wtas, wtadb
+        wtas_class = self.get_wtas_class(name)
+        wtas = wtas_class(polygon_ip=polygon_ip,
+                          polygon_port=polygon_port)
+        return wtas
 
     def deliver(self, wserver_id, *args, **kwargs):
         """ Доставить данные до GCore. Отметить успешность доставки.
@@ -191,5 +225,5 @@ class WTA(GetOperator):
         self.wtas.send(wserver_id=wserver_id, *args, **kwargs)
         report_id = self.wtadb.mark_send(gdb_id=wserver_id)
         response = self.wtas.get()
-        res = self.operate_response(response, report_id)
+        res = self.operate_response(response, report_id, wserver_id)
         return res

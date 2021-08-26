@@ -13,7 +13,8 @@ class MainTest(unittest.TestCase):
         self.assertTrue(res)
 
     def test_companies2(self):
-        wta = operators.WTA('companies')
+        wta = operators.WTA('companies', 'gdb', 'watchman', 'hect0r1337',
+                            '192.168.100.118', 9)
         res = wta.deliver(name='test_company_1', wserver_id=507970, inn=123,
                           kpp=31231)
         self.assertTrue(res)
@@ -60,8 +61,8 @@ class MainTest(unittest.TestCase):
         return True
 
     def get_operators(self, name):
-        wtas_class = operators.GetOperator().get_wtas(name)
-        wtadb_class = operators.GetOperator().get_wtadb(name)
+        wtas_class = operators.GetOperator().get_wtas_class(name)
+        wtadb_class = operators.GetOperator().get_wtadb_class(name)
         wtadb = wtadb_class(dbname='gdb', user='watchman',
                             password='hect0r1337',
                             host='192.168.100.118',
