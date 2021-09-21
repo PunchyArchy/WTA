@@ -63,7 +63,6 @@ class WTADB(ABC, Wsqluse):
         command = "SELECT * FROM wta_connection_info WHERE polygon={}"
         command = command.format(self.polygon_id)
         response = self.get_table_dict(command)
-        print("RESS", response)
         if response['status'] == 'success':
             return response['info'][0]
 

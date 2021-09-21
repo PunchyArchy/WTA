@@ -22,13 +22,21 @@ class TrashCatsDB(WTADB):
 class TrashTypesS(WTAS):
     """ Оператор передачи данных в AR. """
 
-    def send(self, name, wserver_id, cat_id, *args, **kwargs):
+    def send(self, name, wserver_id, trash_cat_id, *args, **kwargs):
         self.add_trash_type(type_name=name, wserver_id=wserver_id,
-                            wserver_cat_id=cat_id)
+                            wserver_cat_id=trash_cat_id)
+
+
+class TrashTypesSUPD(WTAS):
+    """ Оператор передачи о обновлении вида груза в AR. """
+
+    def send(self, type_id, new_name, new_cat_id, active, *args, **kwargs):
+        self.upd_trash_type(type_id=type_id, name=new_name,
+                            category=new_cat_id, active=active)
 
 
 class TrashTypesDB(WTADB):
-    """ Оператор обработки ответа от AR. """
+    """ Оператор обработки ответа от AR об обновлении вида груза """
 
     def __init__(self, *args, **kwargs):
         super().__init__(table_name='trash_types_send_reports',
@@ -84,6 +92,8 @@ class UserDB(WTADB):
                          column_name='operator', *args, **kwargs)
 
 
+
+
 class GetOperator:
     """ Класс, который возвращает объекты для отправки данных на AR и обработку
     ответов. Главным компонентом является атрибут operators, который содержит
@@ -100,6 +110,9 @@ class GetOperator:
                                'wtadb': TrashCatsDB},
                           'trash_types':
                               {'wtas': TrashTypesS,
+                               'wtadb': TrashTypesDB},
+                          'trash_types_upd':
+                              {'wtas': TrashTypesSUPD,
                                'wtadb': TrashTypesDB},
                           'companies':
                               {'wtas': CompaniesS,
@@ -177,7 +190,7 @@ class WTA(GetOperator):
         response = {}
         response['report_id'] = report_id
         response['wserver_id'] = wserver_id
-        if response['info']['status'] == 'success':
+        if ar_response['info']['status'] == 'success':
             self.wtadb.mark_get(wdb_id=ar_response['info']['info'][0][0],
                                 report_id=report_id)
             response['success_save'] = True

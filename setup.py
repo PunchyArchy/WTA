@@ -3,7 +3,7 @@ from os.path import join, dirname
 
 setup(
     name='wta',
-    version='0.0.5',
+    version='0.0.8',
     packages=find_packages(),
     author='PunchyArchy',
     author_email='ksmdrmvscthny@gmail.com',
